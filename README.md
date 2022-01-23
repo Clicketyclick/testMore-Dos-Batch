@@ -130,7 +130,6 @@ unitTest.testMore.cmd -- Unit Test for testMore.cmd - test framework
 ### SYNOPSIS
 
 - `unitTest.testMore.cmd [Options]`
-- `unitTest.testMore.cmd [Function]`
  
 ### OPTIONS
 
