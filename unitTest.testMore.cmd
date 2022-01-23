@@ -1,15 +1,110 @@
 @ECHO OFF&
 SETLOCAL EnableDelayedExpansion
+:testMore
+:: NAME
+::@(-)  The name of the command or function, followed by a one-line description of what it does.
+::       unitTest.testMore.cmd -- Unit Test for testMore.cmd - test framework
+::  
+:: SYNOPSIS
+::@(-)  In the case of a command, a formal description of how to run it and what command line options it takes. 
+::@(-)  For program functions, a list of the parameters the function takes and which header file contains its definition.
+::@(-)  
+::       unitTest.testMore.cmd [Options]
+::       unitTest.testMore.cmd [Function]
+::  
+:: OPTIONS
+::@(-)  Flags, parameters, arguments (NOT the Monty Python way)
+::   -h      Help page
+::   --help  Help page
+::  
+:: DESCRIPTION
+::@(-)  A textual description of the functioning of the command or function.
+:: Unit Test for testMore.cmd - test framework
+::@(-):: Tests are named as [UnitOfWork_StateUnderTest_ExpectedBehavior]
+::
+:: TESTS  
+:: - :OK
+:: - :IS
+:: - :ISNT
+:: - :LIKE
+:: - :PASS / :FAIL
+::
+:: FILES
+::@(-)  Files used, required, affected
+::  file1 = Base file for comparing
+::  file2 = Identical copy
+::  file3 = Diverting file
+:: 
+:: BUGS / KNOWN PROBLEMS
+::@(-)  If any known
+:: 
+:: REQUIRES
+::@(-)  Dependecies
+::  testMore.cmd
+::  
+:: SEE ALSO
+::@(-)  A list of related commands or functions.
+::   
+:: REFERENCES
+::@(-)  References to inspiration, clips and other documentation
+::   Author: 
+::   URL: https://metacpan.org/pod/Test::More
+::   URL: https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-features/customizing-your-repository/about-readmes
+::   URL: https://en.wikipedia.org/wiki/Test::More
+:: 
+:: SOURCE
+::@(-)  Where to find
+::
+:: Author       Erik Bachmann, ClicketyClick.dk [ErikBachmann@ClicketyClick.dk]
+:: Copyright    http://www.gnu.org/licenses/lgpl.txt LGPL version 3
+:: Since        2022-01-21T20:54:11 / erba
+:: Version      01.03
+:: Release      2022-01-23T21:25:41
+::<<testMore
 
-CALL testMore :note %~n0 - Unit Test for testMore.cmd - test framework
+:run
+    SET $sub=%~1
+    IF NOT DEFINED $sub GOTO:main
+    IF "-" == "%$SUB:~0,1%" (   :: Flags
+        IF /I "-h" == "%$SUB:~0,2%" (
+            CALL :_usage %2
+        )
+        IF /I "--help" == "%$SUB:~0,6%" (
+            CALL :_usage %2
+        )
+    ) ELSE IF ":_" == "%$SUB:~0,2%" (
+        1>&2 ECHO:ERROR - Calling internal sub function in %0 [%~1]
+        EXIT /b 255
+    ) ELSE (
+        ::CALL %*
+        GOTO:main
+    )
+GOTO :EOF
 
-:: Tests are named as [UnitOfWork_StateUnderTest_ExpectedBehavior]
+::----------------------------------------------------------------------
 
-:: Set debugging: On if defined
-::SET DEBUG=
-::SET DEBUG=1
+:_usage
+    SET _f=%~1
 
-:: Write header
+    IF DEFINED _f (
+        ::CALL testMore :extractFileSection "%_f%" "::<<%_f%" "%~f0" 2>&1
+        CALL :extractFileSection "%_f%" "::<<%_f%" "%~f0" 2>&1
+    ) ELSE (
+        ::CALL testMore :extractFileSection ":testMore" "::<<testMore" "%~f0" 2>&1
+        CALL :extractFileSection ":testMore" "::<<testMore" "%~f0" 2>&1
+    )
+GOTO :EOF
+
+::----------------------------------------------------------------------
+
+:main
+
+    :: Set debugging: On if defined
+    ::SET DEBUG=
+    ::SET DEBUG=1
+
+    :: Write header
+    CALL testMore :note %~n0 - Testing: testMore
     CALL testMore :note Test :ok DeBUG=%DEBUG%
     CALL testMore :note 
     CALL testMore :note *** Please note that the expected result is given in []
@@ -80,15 +175,50 @@ CALL testMore :note %~n0 - Unit Test for testMore.cmd - test framework
     CALL testMore :pass "	[OK     ]	pass:Test 0"
     CALL testMore :harness :fail "	[OK/fail]	fail:Test 1"
 
-CALL testMore :note --- DONE
-CALL testMore :done_testing
-CALL testMore :note Entended to fail	2, 4, 5, 8, 10, 11, 13, 15
-CALL testMore :note Handled by :harness
-CALL testMore :note *1) Note that FINDSTR does NOT handle regex very well.
+:done
+    CALL testMore :note --- DONE
+    CALL testMore :done_testing
+    CALL testMore :note Entended to fail	2, 4, 5, 8, 10, 11, 13, 15
+    CALL testMore :note Handled by :harness
+    CALL testMore :note *1) Note that FINDSTR does NOT handle regex very well.
 
-:: Will exit after en short warning
-::CALL testMore :BAIL_OUT "Out of air - Bailing out and exit"
+    :: Will exit after en short warning
+    ::CALL testMore :BAIL_OUT "Out of air - Bailing out and exit"
 
-CALL testMore :note Done [%0]
+    CALL testMore :note Done [%0]
 
-::*** End of File ***
+GOTO:EOF
+
+::----------------------------------------------------------------------
+
+:extractFileSection
+:: :extractFileSection - extracts a section of file that is defined by a start and end mark
+::Description:	call:extractFileSection StartMark EndMark FileName
+::Syntax:	:extractFileSection StartMark EndMark FileName
+:: -- extracts a section of file that is defined by a start and end mark
+::                  -- [IN]     StartMark - start mark, use '...:S' mark to allow variable substitution
+::                  -- [IN,OPT] EndMark   - optional end mark, default is first empty line
+::                  -- [IN,OPT] FileName  - optional source file, default is THIS file
+::$created=20080219
+::$changed=20100205
+::$categories=FileOperation
+::$source=https://www.dostips.com
+::$VERSION=2010-02-05
+::<<extractFileSection
+SETLOCAL Disabledelayedexpansion
+set "bmk=%~1"
+set "emk=%~2"
+set "src=%~3"
+set "bExtr="
+set "bSubs="
+if "%src%"=="" set src=%~f0&        rem if no source file then assume THIS file
+for /f "tokens=1,* delims=]" %%A in ('find /n /v "" "%src%" ^| find /v "::@(-)"') do (
+::for /f "tokens=1,* delims=]" %%A in ('find /n /v "" "%src%"') do (
+    if /i "%%B"=="%emk%" set "bExtr="&set "bSubs="
+    if defined bExtr if defined bSubs (call echo.%%B) ELSE (echo.%%B) 
+    if /i "%%B"=="%bmk%"   set "bExtr=Y"
+    if /i "%%B"=="%bmk%:S" set "bExtr=Y"&set "bSubs=Y"
+)
+EXIT /b
+
+::*** End of File ******************************************************
