@@ -80,8 +80,10 @@ CALL testMore :harness :ok 1 "	[OK/fail]	ok:Test 1"
 CALL testMore :done_testing
 ```
 
+- Plan to run 2 tests
 - First test has an Errorlevel of 0 (= OK)
 - Second test has an Errorlevel of 1 (= Error), but this is expected and valid. The harness ensures that the result is OK since the "Failure" is valid
+- Get the result
  
 Please see unitTest.testMore.cmd for a more extended example
  
