@@ -53,7 +53,6 @@ Test | Purpos
 `:isa_ok $object   $class $object_name`	| NOT implemented
 `:isa_ok $subclass $class $object_name`	| NOT implemented
 `:isa_ok $ref      $type  $ref_name`	| NOT implemented
-`:isa_ok on that object.
 `:subtest $name => \&code, @args;`	| NOT implemented
 `:subtest` |runs the &code as its own little test with its own plan and its
 `:require_ok`	| Cannot be implemented, since BATCH has no include function
