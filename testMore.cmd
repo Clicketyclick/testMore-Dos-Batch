@@ -1,4 +1,4 @@
-@ECHO OFF
+::ECHO OFF
 ::SETLOCAL ENABLEDELAYEDEXPANSION&::(Don't pollute the global environment with the following)
 ::**********************************************************************
 SET $NAME=testMore.cmd
@@ -120,11 +120,20 @@ SET $SOURCE=%~f0
 :: Copyright    http://www.gnu.org/licenses/lgpl.txt LGPL version 3
 :: Since        2022-01-21T20:54:11 / erba
 :: Version      01.03
-:: Release      2022-01-23T21:02:24
+:: Release      2023-05-08T20:51:26
 ::<<testMore
 
 :run
-    IF DEFINED DEBUG ECHO:: Call subfunction [%~1]
+SET AnsiOK=[97m[42m
+SET AnsiFAIL=[97m[41m
+SET AnsiSKIP=[97m[44m&
+SET AnsiMissing=[97m[100m
+SET AnsiRESET=[0m
+SET AnsiItalic=[3m
+Set AnsiRESET=[0m
+
+    ::%_DEBUG_% Call subfunction [%~1]
+    IF NOT DEFINED $TESTMORE_STATUS SET $TESTMORE_STATUS=TESTMORE_STATUS
     SET $sub=%~1
     IF "-" == "%$SUB:~0,1%" (   :: Flags
         IF /I "-h" == "%$SUB:~0,2%" (
@@ -143,14 +152,15 @@ GOTO :EOF
 
 ::----------------------------------------------------------------------
 
-:_usage
+:usage
     SET _f=%~1
 
     IF DEFINED _f (
-        CALL :extractFileSection "%_f%" "::<<%_f%" "%~f0" 2>&1
+        CALL :extractFileSection "%_f%" "::<<%_f%" "%~f0"  2>&1
     ) ELSE (
         CALL :extractFileSection ":testMore" "::<<testMore" "%~f0" 2>&1
     )
+
 GOTO :EOF
 
 ::----------------------------------------------------------------------
@@ -162,46 +172,55 @@ GOTO :EOF
 :: This basically declares how many tests your script is going to run to 
 :: protect against premature failure.
 ::<<:plan
-    (
-        ENDLOCAL
-        SET $testMore_plan=%~1
-        IF NOT DEFINED $testMore_plan SET $testMore_plan=%~1
-        SET $testMore_done=0
-        SET $testMore_ok=0
-        SET $testMore_fail=0
-        SET $testMore_faillog=
-        SET $testMore_log=%~dpn0.log
-        IF DEFINED DEBUG (
-            ECHO:
-            ECHO:LISTING PLAN:
-            SET $test
-            ECHO:
-        )
-    )
-        ECHO:$testMore_log=[%$testMore_log%]
+	%_DEBUG_% THIS IS A PLAN
+	SET $testMore_plan=%~1
+	IF NOT DEFINED $testMore_plan SET $testMore_plan=1
+	SET $testMore_started=0
+	SET $testMore_done=0
+	SET $testMore_ok=0
+	SET $testMore_fail=0
+	SET $testMore_skip=0
+	SET $testMore_fail_log=
+	SET $testMore_log=%~dpn0.log
+	IF DEFINED DEBUG (
+		ECHO:
+		ECHO:LISTING PLAN:
+		SET $test
+		ECHO:
+	)
+	ECHO:Planed no of tests: %$testMore_plan%
+    ECHO:$testMore_log=[%$testMore_log%]
+	ECHO:
 GOTO :EOF *** :plan ***
 
 ::----------------------------------------------------------------------
 
 :done_testing
 :: :done_testing - The result of all your testing according to plan
+:: $testMore_plan
 ::<<:done_testing
     1>&2 ECHO:
     IF /I ".%$testMore_plan%" equ ".%$testMore_done%" (
         IF /I ".0" == ".%$testMore_fail%" (
-            1>&2 ECHO:*** SUCCESS : Ran as expected
+            1>&2 ECHO:*** SUCCESS : Ran as expected [Done:%$testMore_done%/ Plan:%$testMore_plan%]
         ) ELSE (
-            1>&2 ECHO:*** FAILED : All tests ran, but with some errors
+            1>&2 ECHO:*** FAILED : All tests ran, but with some errors [Done:%$testMore_done%/ Plan:%$testMore_plan%]
         )
     ) ELSE (
-        1>&2 ECHO:*** FAILED : Ran NOT as expected
+        1>&2 ECHO:*** FAILED : Ran NOT as expected: [Done:%$testMore_done%/ Plan:%$testMore_plan%]
     )
         1>&2 ECHO: Planed:   %$testMore_plan%
         1>&2 ECHO: Ran:      %$testMore_done%
         1>&2 ECHO: OK:       %$testMore_ok%
         1>&2 ECHO: Failed:   %$testMore_fail%
-        IF DEFINED $testMore_faillog 1>&2 ECHO: - Tests failed:	%$testMore_faillog%
+        1>&2 ECHO: Skipped:  %$testMore_skip%
+        IF DEFINED $testMore_fail_log (
+			1>&2 ECHO: - Tests failed:
+			:: https://ss64.com/nt/echo.html#path - replacing the semicolons with newlines
+			1>&2 ECHO:    - %$testMore_fail_log:\n= & ECHO:    - %
+		)
     )
+	TITLE %_LIB%: [%$testMore_done% done/%$testMore_plan% planed]
 GOTO :EOF   *** :done_testing ***
 
 ::----------------------------------------------------------------------
@@ -213,7 +232,6 @@ GOTO :EOF   *** :done_testing ***
 :: and uses that to determine if the test succeeded or failed. 
 :: A true expression passes, a false one fails. Very simple.
 ::<<:ok
-    SET /A $testMore_done+=1
     SET $testMore_tmp=%temp%\%random%.txt
     IF ".0" == ".%~1" (
         CALL :_DID_succeed "%~2"
@@ -221,9 +239,35 @@ GOTO :EOF   *** :done_testing ***
         CALL :_DID_fail "%~2" $testMore_tmp
     )
     IF DEFINED DEBUG  (
-        ECHO:OK_$testMore_fail=%$testMore_ok%
-        ECHO:OK_$testMore_fail=%$testMore_fail%
+        ECHO:OK	$testMore_done=%$testMore_done% $testMore_ok=%$testMore_ok%
+        ECHO:OK $testMore_fail=%$testMore_fail%
+		CALL :_state
     )
+	CALL :_state
+EXIT /b %Errorlevel%
+:: OK
+
+::----------------------------------------------------------------------
+
+:notok
+:: :notok ERRORLEVEL $test_name - Evaluate a FALSE expression
+::
+:: This simply evaluates any expression ($got eq $expected is just a simple example) 
+:: and uses that to determine if the test succeeded or failed. 
+:: A true expression passes, a false one fails. Very simple.
+::<<:notok
+    SET $testMore_tmp=%temp%\%random%.txt
+    IF /I ".0" NEQ ".%~1" (
+        CALL :_DID_succeed "%~2"
+    ) ELSE (
+        CALL :_DID_fail "%~2" $testMore_tmp
+    )
+    IF DEFINED DEBUG  (
+        ECHO:NOTOK $testMore_ok=%$testMore_ok%
+        ECHO:NOTOK $testMore_fail=%$testMore_fail%
+		CALL :_state
+    )
+	CALL :_state
 EXIT /b %Errorlevel%
 :: OK
 
@@ -234,13 +278,11 @@ EXIT /b %Errorlevel%
 ::
 :: Similar to :ok, :like matches $got against the regex qr/expected/.
 ::<<:like
-    SET /A $testMore_done+=1
-
     SET $testMore_tmp=%temp%\%random%.txt
     ::fc "%~1" "%~2" 2>&1 1> "%$testMore_tmp%"
     SET $str=%~1
     CALL :trimregex $str "/" $opts
-    IF DEFINED DEBUG ECHO:Output str[%$str%] Options[%$opts%]
+    %_DEBUG_% :Output str[%$str%] Options[%$opts%]
     IF NOT "." == ".%$opts%" SET $opts=/%$opts%
     FINDSTR %$opts% /r "%$str%" "%~2" ^
         2>&1 1> "%$testMore_tmp%"   
@@ -251,9 +293,11 @@ EXIT /b %Errorlevel%
         CALL :_DID_succeed "%~3"
     )
     IF DEFINED DEBUG  (
-        ECHO:like_$testMore_fail=%$testMore_ok%
-        ECHO:like_$testMore_fail=%$testMore_fail%
+        ECHO:like $testMore_ok=%$testMore_ok%
+        ECHO:like $testMore_fail=%$testMore_fail%
+		CALL :_state
     )
+	CALL :_state
 EXIT /b %Errorlevel%
 :: Like
 
@@ -266,7 +310,6 @@ EXIT /b %Errorlevel%
 :: eq and ne respectively and use the result of that to determine 
 :: if the test succeeded or failed.
 ::<<:is
-    SET /A $testMore_done+=1
     SET IS_OK=0
     SET $testMore_tmp=%temp%\%random%.txt
     fc "%~1" "%~2" 2>&1 1> "%$testMore_tmp%"
@@ -278,9 +321,11 @@ EXIT /b %Errorlevel%
         CALL :_DID_succeed "%~3"
     )
     IF DEFINED DEBUG  (
-        ECHO:OK_$testMore_fail=%$testMore_ok%
-        ECHO:OK_$testMore_fail=%$testMore_fail%
+        ECHO:IS $testMore_ok=%$testMore_ok%
+        ECHO:IS $testMore_fail=%$testMore_fail%
+		CALL :_state
     )
+	CALL :_state
 EXIT /b %IS_OK%
 :: IS
 
@@ -293,8 +338,6 @@ EXIT /b %IS_OK%
 :: eq and ne respectively and use the result of that to determine 
 :: if the test succeeded or failed.
 ::<<:isnt
-    SET /A $testMore_done+=1
-
     SET $testMore_tmp=%temp%\%random%.txt
     FC "%~1" "%~2" 2>&1 1> "%$testMore_tmp%"
 
@@ -305,9 +348,11 @@ EXIT /b %IS_OK%
     )
 
     IF DEFINED DEBUG (
-        ECHO:NOT_OK_$testMore_fail=%$testMore_ok%
-        ECHO:NOT_OK_$testMore_fail=%$testMore_fail%
+        ECHO:ISNT $testMore_fail=%$testMore_ok%
+        ECHO:ISNT $testMore_fail=%$testMore_fail%
+		CALL :_state
     )
+	CALL :_state
 ENDLOCAL&EXIT /b %Errorlevel%
 :: ISNT
 
@@ -319,6 +364,8 @@ ENDLOCAL&EXIT /b %Errorlevel%
 :: Works exactly as :like, only it checks if $got does not match the given pattern.
 ::<<:unlike
     ECHO:$0 - NOT implemented
+	CALL :_DID_skip %*
+	CALL :_state
 EXIT /B 255
 
 GOTO :EOF
@@ -333,6 +380,8 @@ GOTO :EOF
 :: The test passes if the comparison is true and fails otherwise.
 ::<<:cmp_ok
     ECHO:$0 - NOT implemented
+	CALL :_DID_skip %*
+	CALL :_state
 EXIT /B 255
 
 ::----------------------------------------------------------------------
@@ -345,6 +394,8 @@ EXIT /B 255
 :: (works with functions, too).
 ::<<:can_ok
     ECHO:$0 - NOT implemented
+	CALL :_DID_skip %*
+	CALL :_state
 EXIT /B 255
 
 ::----------------------------------------------------------------------
@@ -358,6 +409,8 @@ EXIT /B 255
 :: Also checks to make sure the object was defined in the first place. 
 ::<<:isa_ok
     ECHO:$0 - NOT implemented
+	CALL :_DID_skip %*
+	CALL :_state
 EXIT /B 255
 
 ::----------------------------------------------------------------------
@@ -371,6 +424,8 @@ EXIT /B 255
 :: :isa_ok on that object.
 ::<<:new_ok
     ECHO:$0 - NOT implemented
+	CALL :_DID_skip %*
+	CALL :_state
 EXIT /B 255
 
 ::----------------------------------------------------------------------
@@ -383,6 +438,8 @@ EXIT /B 255
 :: of the whole subtest to determine if its ok or not ok.
 ::<<:subtest
     ECHO:$0 - NOT implemented
+	CALL :_DID_skip %*
+	CALL :_state
 EXIT /B 255
 
 ::----------------------------------------------------------------------
@@ -399,7 +456,8 @@ EXIT /B 255
 :: 
 :: Use these very, very, very sparingly.
 ::<<:pass
-    CALL :OK 0 %*
+    CALL :%AnsiMissing=%OK   %AnsiRESET%0 %*
+	CALL :_state
 GOTO :EOF
 
 ::----------------------------------------------------------------------
@@ -415,7 +473,9 @@ GOTO :EOF
 :: Synonyms for: :ok 1
 :: 
 :: Use these very, very, very sparingly.
-    CALL :OK 1 %*
+::<<:fail
+    CALL :%AnsiSKIP=%FAIL  %AnsiRESET% 1 %*
+	CALL :_state
 GOTO :EOF
 
 ::----------------------------------------------------------------------
@@ -424,6 +484,8 @@ GOTO :EOF
 :: :require_ok - Cannot be implemented, since BATCH has no include function
 ::<<:require_ok
     ECHO:$0 - NOT implemented
+	CALL :_DID_skip %*
+	CALL :_state
 EXIT /B 255
 
 ::----------------------------------------------------------------------
@@ -432,6 +494,8 @@ EXIT /B 255
 :: :use_ok - Cannot be implemented, since BATCH has no include function
 ::<<:use_ok
     ECHO:$0 - NOT implemented
+	CALL :_DID_skip %*
+	CALL :_state
 EXIT /B 255
 
 ::----------------------------------------------------------------------
@@ -441,6 +505,8 @@ EXIT /B 255
 :: Use dump and compare :is or :isnt
 ::<<:is_deeply
     ECHO:$0 - NOT implemented
+	CALL :_DID_skip %*
+	CALL :_state
 EXIT /B 255
 
 ::----------------------------------------------------------------------
@@ -456,8 +522,16 @@ EXIT /B 255
 ::      echo :: bla bla bla
 ::  )
 ::<<:skip
-    ECHO:$0 - NOT directly implemented. Please see: testMore -h :skip
-EXIT /B 255
+    ::1>&2 ECHO Not implemented [%0]
+    ::SET /A $testMore_done+=1
+    ::SET /A $testMore_skip+=1
+	%_DEBUG_%	%0 SKIP 1: Done:%$testMore_done% SKip:%$testMore_skip%
+    SET $testMore_tmp=%temp%\%random%.txt
+    CALL :_DID_skip "%~1" $testMore_tmp
+	%_DEBUG_%	%0 SKIP 2: Done:%$testMore_done% SKip:%$testMore_skip%
+	SET ERRORLEVEL=-1
+	CALL :_state
+GOTO :EOF
 
 ::----------------------------------------------------------------------
 
@@ -465,8 +539,13 @@ EXIT /B 255
 :: :TODO - Declares a block of tests you expect to fail and $why. 
 :: Perhaps it's because you haven't fixed a bug or haven't finished a new feature:
 ::<<:TODO
-    1>&2 ECHO Not implemented [%0]
-GOTO :EOF
+    %_DEBUG_%	%0 TODO 1: Done:%$testMore_done% TODO:%$testMore_skip%
+    SET $testMore_tmp=%temp%\%random%.txt
+    CALL :_DID_skip "%~1" $testMore_tmp TODO
+    %_DEBUG_%	%0 SKIP 2: Done:%$testMore_done% TODO:%$testMore_skip%
+    SET ERRORLEVEL=-1
+	CALL :_state
+GOTO :EOF :TODO
 
 ::----------------------------------------------------------------------
 
@@ -483,7 +562,7 @@ GOTO :EOF
 ::The test will exit with 255.
 ::<<:BAIL_OUT
     >&2 ECHO:%*
-    ECHO:Bailing out
+    ECHO:%AnsiMissing=%Bailing out%AnsiRESET%
     TIMEOUT /T 10
 EXIT 255
 
@@ -495,7 +574,7 @@ EXIT 255
 :: Prints a diagnostic message which is guaranteed not to interfere 
 :: with test output.
 ::<<:diag
-    ECHO:# %* 1>&2
+    ECHO:#%AnsiItalic% %* %AnsiRESET=% 1>&2
 GOTO:EOF
 
 ::----------------------------------------------------------------------
@@ -508,7 +587,7 @@ GOTO:EOF
 :: Handy for putting in notes which might be useful for debugging, but 
 :: don't indicate a problem.
 ::<<:note
-    ECHO:# %* 2>&1
+    ECHO:#%AnsiItalic% %* %AnsiRESET=% 2>&1
 GOTO:EOF
 
 ::----------------------------------------------------------------------
@@ -526,21 +605,24 @@ GOTO:EOF
 :_DID_Fail
 :: :_DID_Fail - Action on failure
 ::<<:_DID_Fail
+    SET /A $testMore_done+=1
     SET /A $testMore_fail+=1
-    IF "." == ".%$testMore_faillog%" (
-        SET $testMore_faillog=%$testMore_done%
+    IF "." == ".%$testMore_fail_log%" (
+        SET $testMore_fail_log=%$testMore_done% _ %~1
     ) ELSE (
-        SET $testMore_faillog=%$testMore_faillog%, %$testMore_done%
+        SET $testMore_fail_log=%$testMore_fail_log%\n%$testMore_done% _ %~1
     )
-    ECHO:Not OK	[%$testMore_done%] - %~1
+    %_VERBOSE_% Not OK	[%$testMore_done%] - %~1
+    ECHO:%AnsiFAIL=%Not OK	%AnsiRESET%[%$testMore_done%] - %~1>>%$TESTMORE_STATUS%
 
     IF EXIST "%~2%" (
         :: Display diff
         FOR /F %%i IN ( 'TYPE "!%~2!"' ) DO ECHO:# %%i
         :: Delete diff
-        IF DEFINED DEBUG ECHO: Deleting [%~2]
+        %_DEBUG_% Deleting [%~2]
         DEL "%~2"
     )
+	SET ERRORLEVEL=1
 GOTO :EOF
 
 ::----------------------------------------------------------------------
@@ -549,9 +631,33 @@ GOTO :EOF
 :: :_DID_succeed - Action on success
 ::<<:_DID_succeed
     SET /A $testMore_OK+=1
-    ECHO:OK	[%$testMore_done%] - %~1
+    SET /A $testMore_done+=1
+    %_VERBOSE_% OK	[%$testMore_done%] - %~1
+    ECHO:%AnsiOK% OK	%AnsiRESET%[%$testMore_done%] - %~1>>%$TESTMORE_STATUS%
     IF EXIST "%$testMore_tmp%" (
-        IF DEFINED DEBUG ECHO: Deleting [%$testMore_tmp%]
+        %_DEBUG_% Deleting [%$testMore_tmp%]
+        DEL "%$testMore_tmp%"
+    )
+	SET ERRORLEVEL=0
+GOTO :EOF
+
+::----------------------------------------------------------------------
+
+:_DID_skip
+:: :_DID_skip - Action on skip
+::<<:_DID_skip
+	SET _CAUSE=%~3
+	IF NOT DEFINED _CAUSE SET _CAUSE=SKIP
+	
+    SET /A $testMore_skip+=1
+    SET /A $testMore_done+=1
+	
+	%_DEBUG_%	%0 %_CAUSE%: Done:%$testMore_done% %_CAUSE%:%$testMore_skip%
+    %_VERBOSE_% %_CAUSE%	[%$testMore_done%] - %~1.
+    ECHO:%AnsiSKIP%%_CAUSE%	%AnsiRESET%[[%$testMore_done%] - %~1>>%$TESTMORE_STATUS%
+	
+    IF EXIST "%$testMore_tmp%" (
+        %_DEBUG_% Deleting [%$testMore_tmp%]
         DEL "%$testMore_tmp%"
     )
 GOTO :EOF
@@ -582,7 +688,7 @@ GOTO :EOF
     SET $Stored_testMore_done=%$testMore_done%
     SET $Stored_testMore_ok=%$testMore_ok%
     SET $Stored_testMore_fail=%$testMore_fail%
-    SET $Stored_testMore_faillog=%$testMore_faillog%
+    SET $Stored_testMore_faillog=%$testMore_fail_log%
 GOTO :EOF
 
 ::----------------------------------------------------------------------
@@ -593,7 +699,7 @@ GOTO :EOF
     SET $testMore_done=%$Stored_testMore_done%
     SET $testMore_ok=%$Stored_testMore_ok%
     SET $testMore_fail=%$Stored_testMore_fail%
-    SET $testMore_faillog=%$Stored_testMore_faillog%
+    SET $testMore_fail_log=%$Stored_testMore_faillog%
 GOTO :EOF
 
 ::----------------------------------------------------------------------
@@ -686,28 +792,28 @@ GOTO :EOF
         set char=%~2
         ::set max=%~3
         CALL :strlen %~1 max
-        IF DEFINED DEBUG ECHO Max=%max%
+        %_DEBUG_% Max=%max%
 
         if "%char%"=="" set char= &rem one space
 
-        IF DEFINED DEBUG ECHO char=[%char%]
+        %_DEBUG_% char=[%char%]
         ::if "%max%"=="" set max=32
 
         for /l %%a in (1,1,%max%) do (
-            IF DEFINED DEBUG echo loop:%%a
+            %_DEBUG_% loop:%%a
             if "!string:~-1!"=="%char%" (
                 set string=!string:~0,-1!
-                IF DEFINED DEBUG ECHO: newstr[!string!]
+                %_DEBUG_% newstr[!string!]
                 GOTO :trimregex_done
             ) ELSE (
                 SET arg=!string:~-1!!arg!
                 set string=!string:~0,-1!
-                IF DEFINED DEBUG ECHO: newstr[!string!]
-                IF DEFINED DEBUG ECHO: arg[!arg!]
+                %_DEBUG_% newstr[!string!]
+                %_DEBUG_% arg[!arg!]
             )
         )
         :trimregex_done
-        IF DEFINED DEBUG ECHO: String[%string%] arg[%arg%]
+        %_DEBUG_% String[%string%] arg[%arg%]
 
     ( ENDLOCAL & REM RETURN VALUES
         IF "%~1" NEQ "" SET %~1=%string%
@@ -769,12 +875,36 @@ set "bExtr="
 set "bSubs="
 if "%src%"=="" set src=%~f0&        rem if no source file then assume THIS file
 for /f "tokens=1,* delims=]" %%A in ('find /n /v "" "%src%" ^| find /v "::@(-)"') do (
-::for /f "tokens=1,* delims=]" %%A in ('find /n /v "" "%src%"') do (
     if /i "%%B"=="%emk%" set "bExtr="&set "bSubs="
     if defined bExtr if defined bSubs (call echo.%%B) ELSE (echo.%%B) 
     if /i "%%B"=="%bmk%"   set "bExtr=Y"
     if /i "%%B"=="%bmk%:S" set "bExtr=Y"&set "bSubs=Y"
 )
 EXIT /b
+
+::----------------------------------------------------------------------
+
+:: Count all calls to test functions to set plan
+:PLAN_TESTMORE sourcefile returnvar
+	SETLOCAL ENABLEDELAYEDEXPANSION
+		SET CALL_TESTMORE=
+		FOR %%i IN ( ok notok is isnt like skip todo ) DO CALL SET "CALL_TESTMORE= /C:^"[^^^^:]CALL .$TestMore. :%%i^" !CALL_TESTMORE!"
+		
+		(
+			%_DEBUG_% $testMore_plan.CALL_TESTMORE=%CALL_TESTMORE%
+			ECHO: $testMore_plan.CALL_TESTMORE=%CALL_TESTMORE%
+			findstr /I /N /R %CALL_TESTMORE% "%~1" 
+		)> CALL_TESTMORE.txt
+
+		FOR /F %%i IN ( 'findstr /R %CALL_TESTMORE% "%~1" ^|find /c ":"' ) DO CALL SET $testMore_plan=%%i
+		%_DEBUG_% %$testMore_plan% Found
+	ENDLOCAL&CALL SET "%~2=%$testMore_plan%
+GOTO :EOF :PLAN_TESTMORE
+
+::----------------------------------------------------------------------
+:_state
+	::ECHO:$testMore_done=%$testMore_done% $testMore_ok=%$testMore_ok% $testMore_fail=%$testMore_fail%
+	::ECHO:$testMore_done=%$testMore_done%
+GOTO :EOF
 
 ::*** End of File ******************************************************
