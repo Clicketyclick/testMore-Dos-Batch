@@ -124,13 +124,6 @@ SET $SOURCE=%~f0
 ::<<testMore
 
 :run
-SET AnsiOK=[97m[42m
-SET AnsiFAIL=[97m[41m
-SET AnsiSKIP=[97m[44m&
-SET AnsiMissing=[97m[100m
-SET AnsiRESET=[0m
-SET AnsiItalic=[3m
-Set AnsiRESET=[0m
 
     ::%_DEBUG_% Call subfunction [%~1]
     IF NOT DEFINED $TESTMORE_STATUS SET $TESTMORE_STATUS=TESTMORE_STATUS
@@ -181,6 +174,8 @@ GOTO :EOF
 	SET $testMore_fail=0
 	SET $testMore_skip=0
 	SET $testMore_fail_log=
+	SET $testMore_skip_log=
+	SET $testMore_todo_log=
 	SET $testMore_log=%~dpn0.log
 	IF DEFINED DEBUG (
 		ECHO:
@@ -218,6 +213,18 @@ GOTO :EOF *** :plan ***
 			1>&2 ECHO: - Tests failed:
 			:: https://ss64.com/nt/echo.html#path - replacing the semicolons with newlines
 			1>&2 ECHO:    - %$testMore_fail_log:\n= & ECHO:    - %
+            ECHO::::::
+            ECHO [%$testMore_fail_log%]
+		)
+        IF DEFINED $testMore_skip_log (
+			1>&2 ECHO: - Tests skiped:
+			:: https://ss64.com/nt/echo.html#path - replacing the semicolons with newlines
+			1>&2 ECHO:    - %$testMore_skip_log:\n= & ECHO:    - %
+		)
+        IF DEFINED $testMore_todo_log (
+			1>&2 ECHO: - Tests todo:
+			:: https://ss64.com/nt/echo.html#path - replacing the semicolons with newlines
+			1>&2 ECHO:    - %$testMore_todo_log:\n= & ECHO:    - %
 		)
     )
 	TITLE %_LIB%: [%$testMore_done% done/%$testMore_plan% planed]
@@ -232,6 +239,7 @@ GOTO :EOF   *** :done_testing ***
 :: and uses that to determine if the test succeeded or failed. 
 :: A true expression passes, a false one fails. Very simple.
 ::<<:ok
+    ECHO:%0: %*>>temp\performed_tests.txt
     SET $testMore_tmp=%temp%\%random%.txt
     IF ".0" == ".%~1" (
         CALL :_DID_succeed "%~2"
@@ -256,20 +264,23 @@ EXIT /b %Errorlevel%
 :: and uses that to determine if the test succeeded or failed. 
 :: A true expression passes, a false one fails. Very simple.
 ::<<:notok
+    ECHO:%0: %*>>temp\performed_tests.txt
     SET $testMore_tmp=%temp%\%random%.txt
+
     IF /I ".0" NEQ ".%~1" (
         CALL :_DID_succeed "%~2"
     ) ELSE (
         CALL :_DID_fail "%~2" $testMore_tmp
     )
+
     IF DEFINED DEBUG  (
         ECHO:NOTOK $testMore_ok=%$testMore_ok%
         ECHO:NOTOK $testMore_fail=%$testMore_fail%
-		CALL :_state
+        CALL :_state
     )
-	CALL :_state
+    CALL :_state
 EXIT /b %Errorlevel%
-:: OK
+:: notOK
 
 ::----------------------------------------------------------------------
 
@@ -278,6 +289,7 @@ EXIT /b %Errorlevel%
 ::
 :: Similar to :ok, :like matches $got against the regex qr/expected/.
 ::<<:like
+    ECHO:%0: %*>>temp\performed_tests.txt
     SET $testMore_tmp=%temp%\%random%.txt
     ::fc "%~1" "%~2" 2>&1 1> "%$testMore_tmp%"
     SET $str=%~1
@@ -310,6 +322,7 @@ EXIT /b %Errorlevel%
 :: eq and ne respectively and use the result of that to determine 
 :: if the test succeeded or failed.
 ::<<:is
+    ECHO:%0: %*>>temp\performed_tests.txt
     SET IS_OK=0
     SET $testMore_tmp=%temp%\%random%.txt
     fc "%~1" "%~2" 2>&1 1> "%$testMore_tmp%"
@@ -338,6 +351,7 @@ EXIT /b %IS_OK%
 :: eq and ne respectively and use the result of that to determine 
 :: if the test succeeded or failed.
 ::<<:isnt
+    ECHO:%0: %*>>temp\performed_tests.txt
     SET $testMore_tmp=%temp%\%random%.txt
     FC "%~1" "%~2" 2>&1 1> "%$testMore_tmp%"
 
@@ -363,6 +377,7 @@ ENDLOCAL&EXIT /b %Errorlevel%
 :: NOT IMPLEMENTED
 :: Works exactly as :like, only it checks if $got does not match the given pattern.
 ::<<:unlike
+    ECHO:%0: %*>>temp\performed_tests.txt
     ECHO:$0 - NOT implemented
 	CALL :_DID_skip %*
 	CALL :_state
@@ -379,6 +394,7 @@ GOTO :EOF
 :: compare two arguments using any binary perl operator. 
 :: The test passes if the comparison is true and fails otherwise.
 ::<<:cmp_ok
+    ECHO:%0: %*>>temp\performed_tests.txt
     ECHO:$0 - NOT implemented
 	CALL :_DID_skip %*
 	CALL :_state
@@ -393,6 +409,7 @@ EXIT /B 255
 :: Checks to make sure the $module or $object can do these @methods 
 :: (works with functions, too).
 ::<<:can_ok
+    ECHO:%0: %*>>temp\performed_tests.txt
     ECHO:$0 - NOT implemented
 	CALL :_DID_skip %*
 	CALL :_state
@@ -408,6 +425,7 @@ EXIT /B 255
 :: Checks to see if the given $object->isa($class). 
 :: Also checks to make sure the object was defined in the first place. 
 ::<<:isa_ok
+    ECHO:%0: %*>>temp\performed_tests.txt
     ECHO:$0 - NOT implemented
 	CALL :_DID_skip %*
 	CALL :_state
@@ -423,9 +441,10 @@ EXIT /B 255
 :: A convenience function which combines creating an object and calling
 :: :isa_ok on that object.
 ::<<:new_ok
+    ECHO:%0: %*>>temp\performed_tests.txt
     ECHO:$0 - NOT implemented
-	CALL :_DID_skip %*
-	CALL :_state
+    CALL :_DID_skip %*
+    CALL :_state
 EXIT /B 255
 
 ::----------------------------------------------------------------------
@@ -437,6 +456,7 @@ EXIT /B 255
 :: own result. The main test counts this as a single test using the result 
 :: of the whole subtest to determine if its ok or not ok.
 ::<<:subtest
+    ECHO:%0: %*>>temp\performed_tests.txt
     ECHO:$0 - NOT implemented
 	CALL :_DID_skip %*
 	CALL :_state
@@ -456,8 +476,9 @@ EXIT /B 255
 :: 
 :: Use these very, very, very sparingly.
 ::<<:pass
-    CALL :%AnsiMissing=%OK   %AnsiRESET%0 %*
-	CALL :_state
+    ECHO:%0: %*>>temp\performed_tests.txt
+    >&2 ECHO:%Ansi[WARNING]% Passing %Ansi[Reset]% %*
+    CALL :_state
 GOTO :EOF
 
 ::----------------------------------------------------------------------
@@ -474,7 +495,8 @@ GOTO :EOF
 :: 
 :: Use these very, very, very sparingly.
 ::<<:fail
-    CALL :%AnsiSKIP=%FAIL  %AnsiRESET% 1 %*
+    ECHO:%0: %*>>temp\performed_tests.txt
+    CALL :%Ansi[FAIL]%FAIL  %Ansi[Reset]% 1 %*
 	CALL :_state
 GOTO :EOF
 
@@ -483,6 +505,7 @@ GOTO :EOF
 :require_ok
 :: :require_ok - Cannot be implemented, since BATCH has no include function
 ::<<:require_ok
+    ECHO:%0: %*>>temp\performed_tests.txt
     ECHO:$0 - NOT implemented
 	CALL :_DID_skip %*
 	CALL :_state
@@ -493,6 +516,7 @@ EXIT /B 255
 :use_ok
 :: :use_ok - Cannot be implemented, since BATCH has no include function
 ::<<:use_ok
+    ECHO:%0: %*>>temp\performed_tests.txt
     ECHO:$0 - NOT implemented
 	CALL :_DID_skip %*
 	CALL :_state
@@ -525,12 +549,13 @@ EXIT /B 255
     ::1>&2 ECHO Not implemented [%0]
     ::SET /A $testMore_done+=1
     ::SET /A $testMore_skip+=1
-	%_DEBUG_%	%0 SKIP 1: Done:%$testMore_done% SKip:%$testMore_skip%
+    ECHO:%0: %*>>temp\performed_tests.txt
+    %_DEBUG_%	%0 SKIP 1: Done:%$testMore_done% SKip:%$testMore_skip%
     SET $testMore_tmp=%temp%\%random%.txt
     CALL :_DID_skip "%~1" $testMore_tmp
-	%_DEBUG_%	%0 SKIP 2: Done:%$testMore_done% SKip:%$testMore_skip%
-	SET ERRORLEVEL=-1
-	CALL :_state
+    %_DEBUG_%	%0 SKIP 2: Done:%$testMore_done% SKip:%$testMore_skip%
+    SET ERRORLEVEL=-1
+    CALL :_state
 GOTO :EOF
 
 ::----------------------------------------------------------------------
@@ -539,6 +564,7 @@ GOTO :EOF
 :: :TODO - Declares a block of tests you expect to fail and $why. 
 :: Perhaps it's because you haven't fixed a bug or haven't finished a new feature:
 ::<<:TODO
+    ECHO:%0: %*>>temp\performed_tests.txt
     %_DEBUG_%	%0 TODO 1: Done:%$testMore_done% TODO:%$testMore_skip%
     SET $testMore_tmp=%temp%\%random%.txt
     CALL :_DID_skip "%~1" $testMore_tmp TODO
@@ -561,8 +587,9 @@ GOTO :EOF :TODO
 ::
 ::The test will exit with 255.
 ::<<:BAIL_OUT
+    ECHO:%0: %*>>temp\performed_tests.txt
     >&2 ECHO:%*
-    ECHO:%AnsiMissing=%Bailing out%AnsiRESET%
+    ECHO:%Ansi[Missing]% Bailing out %Ansi[Reset]%
     TIMEOUT /T 10
 EXIT 255
 
@@ -574,7 +601,7 @@ EXIT 255
 :: Prints a diagnostic message which is guaranteed not to interfere 
 :: with test output.
 ::<<:diag
-    ECHO:#%AnsiItalic% %* %AnsiRESET=% 1>&2
+    ECHO:#%Ansi[Italic]% %* %Ansi[Reset]=% 1>&2
 GOTO:EOF
 
 ::----------------------------------------------------------------------
@@ -587,7 +614,7 @@ GOTO:EOF
 :: Handy for putting in notes which might be useful for debugging, but 
 :: don't indicate a problem.
 ::<<:note
-    ECHO:#%AnsiItalic% %* %AnsiRESET=% 2>&1
+    ECHO:#%Ansi[Italic]% %* %Ansi[Reset]=% 2>&1
 GOTO:EOF
 
 ::----------------------------------------------------------------------
@@ -612,8 +639,8 @@ GOTO:EOF
     ) ELSE (
         SET $testMore_fail_log=%$testMore_fail_log%\n%$testMore_done% _ %~1
     )
-    %_VERBOSE_% Not OK	[%$testMore_done%] - %~1
-    ECHO:%AnsiFAIL=%Not OK	%AnsiRESET%[%$testMore_done%] - %~1>>%$TESTMORE_STATUS%
+    %_VERBOSE_%%Ansi[Fail]% Not OK     %Ansi[Reset]%[%$testMore_done%] - %~1
+    ECHO:Not OK	[%$testMore_done%] - %~1>>%$TESTMORE_STATUS%
 
     IF EXIST "%~2%" (
         :: Display diff
@@ -632,8 +659,8 @@ GOTO :EOF
 ::<<:_DID_succeed
     SET /A $testMore_OK+=1
     SET /A $testMore_done+=1
-    %_VERBOSE_% OK	[%$testMore_done%] - %~1
-    ECHO:%AnsiOK% OK	%AnsiRESET%[%$testMore_done%] - %~1>>%$TESTMORE_STATUS%
+    %_VERBOSE_%%Ansi[OK]% OK      %Ansi[Reset]%[%$testMore_done%] - %~1
+    ECHO:OK	[%$testMore_done%] - %~1 >>%$TESTMORE_STATUS%
     IF EXIST "%$testMore_tmp%" (
         %_DEBUG_% Deleting [%$testMore_tmp%]
         DEL "%$testMore_tmp%"
@@ -651,10 +678,15 @@ GOTO :EOF
 	
     SET /A $testMore_skip+=1
     SET /A $testMore_done+=1
+    IF "." == ".%$testMore_skip_log%" (
+        SET $testMore_skip_log=%$testMore_done% _ %~1
+    ) ELSE (
+        SET $testMore_skip_log=%$testMore_skip_log%\n%$testMore_done% _ %~1
+    )
 	
 	%_DEBUG_%	%0 %_CAUSE%: Done:%$testMore_done% %_CAUSE%:%$testMore_skip%
-    %_VERBOSE_% %_CAUSE%	[%$testMore_done%] - %~1.
-    ECHO:%AnsiSKIP%%_CAUSE%	%AnsiRESET%[[%$testMore_done%] - %~1>>%$TESTMORE_STATUS%
+    %_VERBOSE_%%Ansi[Skip]% %_CAUSE%  %Ansi[Reset]%[%$testMore_done%] - %~1.
+    ECHO:%_CAUSE%	[%$testMore_done%] - %~1 >>%$TESTMORE_STATUS%
 	
     IF EXIST "%$testMore_tmp%" (
         %_DEBUG_% Deleting [%$testMore_tmp%]
@@ -888,15 +920,21 @@ EXIT /b
 :PLAN_TESTMORE sourcefile returnvar
 	SETLOCAL ENABLEDELAYEDEXPANSION
 		SET CALL_TESTMORE=
-		FOR %%i IN ( ok notok is isnt like skip todo ) DO CALL SET "CALL_TESTMORE= /C:^"[^^^^:]CALL .$TestMore. :%%i^" !CALL_TESTMORE!"
+		FOR %%i IN ( ok notok is isnt like skip todo pass fail ) DO CALL SET "CALL_TESTMORE= /C:^"[^^^^:]CALL .$TestMore. :%%i^" !CALL_TESTMORE!"
 		
 		(
 			%_DEBUG_% $testMore_plan.CALL_TESTMORE=%CALL_TESTMORE%
 			ECHO: $testMore_plan.CALL_TESTMORE=%CALL_TESTMORE%
 			findstr /I /N /R %CALL_TESTMORE% "%~1" 
-		)> CALL_TESTMORE.txt
+		)> temp\CALL_TESTMORE.txt
 
-		FOR /F %%i IN ( 'findstr /R %CALL_TESTMORE% "%~1" ^|find /c ":"' ) DO CALL SET $testMore_plan=%%i
+        IF EXIST temp\performed_tests.txt DEL temp\performed_tests.txt 
+        :: Find the count
+        findstr /R %CALL_TESTMORE% "%~1" |find /c ":" > temp\planed_tests.txt 
+        :: Find all tests
+        findstr /R %CALL_TESTMORE% "%~1" > temp\planed_tests2.txt 
+		%_DEBUG_% count for plan: 'findstr /I /R %CALL_TESTMORE% "%~1" ^|find /c ":"' 
+		FOR /F %%i IN ( 'findstr /I /R %CALL_TESTMORE% "%~1" ^|find /c ":"' ) DO CALL SET $testMore_plan=%%i
 		%_DEBUG_% %$testMore_plan% Found
 	ENDLOCAL&CALL SET "%~2=%$testMore_plan%
 GOTO :EOF :PLAN_TESTMORE
