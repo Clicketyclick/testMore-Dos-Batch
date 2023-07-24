@@ -124,6 +124,22 @@ SET $SOURCE=%~f0
 ::<<testMore
 
 :run
+
+
+Set Ansi[Bold]=[1m&            Set Ansi[BoldOff]=[21m&        :: 
+Set Ansi[Italic]=[3m&          Set Ansi[italicOff]=[23m&      :: 
+
+
+Set Ansi[Inverse]=[7m&         Set Ansi[InverseOff]=[27m
+SET Ansi[OK]=[97m[42m
+SET Ansi[FAIL]=[97m[41m
+SET Ansi[WARNING]=[30m[103m&
+SET Ansi[SKIP]=[97m[44m&
+SET Ansi[Missing]=[97m[100m
+SET Ansi[RESET]=[0m
+
+
+
     ::%_DEBUG_% Call subfunction [%~1]
     SET $sub=%~1
     IF "-" == "%$SUB:~0,1%" (   :: Flags
@@ -178,7 +194,7 @@ GOTO :EOF
 	::%_VERBOSE_% [%~2] 2>&1
     TITLE %TITLE%
     %_DEBUG_% TITLE %TITLE%
-	ECHO:TITLE %TITLE%
+	::ECHO:TITLE %TITLE%
     ENDLOCAL
 GOTO:EOF    :: :Header 
 
@@ -187,7 +203,7 @@ GOTO:EOF    :: :Header
 :Footer - Footer in block (0=OK, ELSE=FAIL)
     TITLE %$testMore_done%/%$testMore_plan% %* [Footer]
     %_DEBUG_% TITLE %$testMore_done%/%$testMore_plan% %* [Footer]
-    ECHO TITLE %$testMore_done%/%$testMore_plan% %* [Footer]
+    ::ECHO TITLE %$testMore_done%/%$testMore_plan% %* [Footer]
 	
     SETLOCAL
 		%_DEBUG_% %%ERRORLEVEL%%=%ERRORLEVEL%
@@ -199,13 +215,13 @@ GOTO:EOF    :: :Header
 		)
         SET _=%$testMore_done%/%$testMore_plan%
         IF DEFINED DEBUG SET _= %~1
-    
+
         IF ".0" EQU ".%~1" (
-            ECHO [OK   %_%] [%~2 - %~3%~4] 1>&2
+            ECHO %Ansi[OK]%[OK   %_%]%Ansi[Reset]% [%~2 - %~3%~4] 1>&2
         ) ELSE IF ".-1" EQU ".%~1" (
-            ECHO [SKIP %_%] [%~2 - %~3%~4] 1>&2
+            ECHO %Ansi[Skip]%[SKIP %_%]%Ansi[Reset]% [%~2 - %~3%~4] 1>&2
         ) ELSE (
-            ECHO [FAIL %_%] [%~1] [%~2 - %~3%~4] 1>&2
+            ECHO %Ansi[Fail]%[FAIL %_%]%Ansi[Reset]% [%~1] [%~2 - %~3%~4] 1>&2
         )
     ENDLOCAL
 GOTO :EOF   :: :Footer
@@ -268,7 +284,7 @@ GOTO :EOF	:: :init
 	%_DEBUG_% CALL %$TESTLIB% :callAllTests
 	CALL %$TESTLIB% :callAllTests
 
-	:: Show status
+	ECHO:: Show status %~nx0[%0]%#-_%287%_-#% 
 	%_DEBUG_% $testMore_plan=%$testMore_plan%
 	CALL %$TestMore% :done_testing
 GOTO :EOF
